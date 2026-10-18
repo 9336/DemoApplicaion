@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PDF Order Modal</title>
+<style>
+  :root{
+    --ink:#2a1210;
+    --paper:#ffffff;
+    --line:#f0d4d2;
+    --accent:#c81e1e;
+    --accent-dark:#a11515;
+    --danger:#a11515;
+    --muted:#a17d7b;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,sans-serif;
+    background:#fdf2f2;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:32px;
+  }
+
+  /* trigger button, for demo purposes */
+  .open-btn{
+    padding:12px 22px;
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    border-radius:8px;
+    font-size:15px;
+    font-weight:600;
+    cursor:pointer;
+    letter-spacing:.2px;
+  }
+  .open-btn:hover{background:var(--accent-dark);}
+
+  /* overlay */
+  .overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(28,27,25,0.55);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+    padding:14px;
+  }
+  .overlay.active{display:flex;}
+
+  /* modal */
+  .modal{
+    background:var(--paper);
+    width:96vw;
+    max-width:1400px;
+    height:94vh;
+    max-height:1100px;
+    border-radius:14px;
+    box-shadow:0 24px 60px rgba(0,0,0,0.35);
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+
+  .modal-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:18px 24px;
+    border-bottom:1px solid var(--line);
+    flex-shrink:0;
+  }
+  .modal-header h2{
+    margin:0;
+    font-size:17px;
+    font-weight:700;
+    color:var(--ink);
+    letter-spacing:.2px;
+  }
+  .modal-header .sub{
+    font-size:12.5px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+  .close-x{
+    background:none;
+    border:none;
+    font-size:20px;
+    color:var(--muted);
+    cursor:pointer;
+    line-height:1;
+    padding:4px 8px;
+    border-radius:6px;
+  }
+  .close-x:hover{background:var(--line);color:var(--ink);}
+
+  /* body / pdf viewer */
+  .modal-body{
+    flex:1;
+    background:#fbe4e3;
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+    position:relative;
+  }
+  .pdf-frame{
+    flex:1;
+    width:100%;
+    border:none;
+    background:#fff;
+  }
+  .empty-state{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    color:var(--muted);
+    text-align:center;
+    padding:30px;
+  }
+  .empty-state svg{opacity:.55;}
+  .empty-state p{margin:0;font-size:14px;max-width:280px;}
+  .pick-btn{
+    padding:9px 18px;
+    background:var(--ink);
+    color:#fff;
+    border:none;
+    border-radius:7px;
+    font-size:13.5px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .pick-btn:hover{opacity:.88;}
+  input[type=file]{display:none;}
+
+  .file-bar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px 24px;
+    background:#fdeceb;
+    border-bottom:1px solid var(--line);
+    font-size:12.5px;
+    color:var(--ink);
+    flex-shrink:0;
+  }
+  .file-bar span{font-weight:600;}
+  .swap-link{
+    color:var(--accent-dark);
+    background:none;
+    border:none;
+    font-size:12.5px;
+    font-weight:600;
+    cursor:pointer;
+    text-decoration:underline;
+  }
+
+  /* footer */
+  .modal-footer{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:12px;
+    padding:16px 24px;
+    border-top:1px solid var(--line);
+    background:var(--paper);
+    flex-shrink:0;
+  }
+  .btn{
+    padding:11px 22px;
+    border-radius:8px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    border:1px solid transparent;
+    letter-spacing:.2px;
+  }
+  .btn-cancel{
+    background:transparent;
+    border-color:var(--line);
+    color:var(--ink);
+  }
+  .btn-cancel:hover{background:var(--line);}
+  .btn-create{
+    background:var(--accent);
+    color:#fff;
+  }
+  .btn-create:hover{background:var(--accent-dark);}
+  .btn-create:disabled{
+    background:#e8b4b2;
+    cursor:not-allowed;
+  }
+
+  .toast{
+    position:fixed;
+    bottom:28px;
+    left:50%;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--ink);
+    color:#fff;
+    padding:12px 20px;
+    border-radius:8px;
+    font-size:13.5px;
+    font-weight:500;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;
+    z-index:200;
+  }
+  .toast.show{
+    opacity:1;
+    transform:translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<button class="open-btn" id="openBtn">Review PDF &amp; Create Order</button>
+
+<div class="overlay" id="overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-header">
+      <div>
+        <h2 id="modalTitle">Review Document</h2>
+        <div class="sub" id="modalSub">Confirm the PDF before creating the order</div>
+      </div>
+      <button class="close-x" id="closeX" aria-label="Close">&times;</button>
+    </div>
+
+    <div class="file-bar" id="fileBar" style="display:none;">
+      <span id="fileName">document.pdf</span>
+      <button class="swap-link" id="swapBtn">Choose a different file</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="empty-state" id="emptyState">
+        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <path d="M14 2v6h6"/>
+        </svg>
+        <p>No PDF loaded yet. Choose a file to preview it here before creating the order.</p>
+        <button class="pick-btn" id="pickBtn">Choose PDF</button>
+        <input type="file" id="fileInput" accept="application/pdf">
+      </div>
+      <iframe class="pdf-frame" id="pdfFrame" style="display:none;"></iframe>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-cancel" id="cancelBtn">Cancel</button>
+      <button class="btn btn-create" id="createBtn" disabled>Create Order</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const overlay = document.getElementById('overlay');
+  const openBtn = document.getElementById('openBtn');
+  const closeX = document.getElementById('closeX');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const createBtn = document.getElementById('createBtn');
+  const fileInput = document.getElementById('fileInput');
+  const pickBtn = document.getElementById('pickBtn');
+  const swapBtn = document.getElementById('swapBtn');
+  const emptyState = document.getElementById('emptyState');
+  const pdfFrame = document.getElementById('pdfFrame');
+  const fileBar = document.getElementById('fileBar');
+  const fileName = document.getElementById('fileName');
+  const toast = document.getElementById('toast');
+
+  let currentFileURL = null;
+
+  function openModal(){
+    overlay.classList.add('active');
+  }
+  function closeModal(){
+    overlay.classList.remove('active');
+  }
+  function resetModal(){
+    if(currentFileURL) URL.revokeObjectURL(currentFileURL);
+    currentFileURL = null;
+    pdfFrame.style.display = 'none';
+    pdfFrame.src = '';
+    fileBar.style.display = 'none';
+    emptyState.style.display = 'flex';
+    createBtn.disabled = true;
+    fileInput.value = '';
+  }
+
+  openBtn.addEventListener('click', openModal);
+  closeX.addEventListener('click', () => { closeModal(); });
+  cancelBtn.addEventListener('click', () => {
+    closeModal();
+    showToast('Order creation cancelled');
+    resetModal();
+  });
+  overlay.addEventListener('click', (e) => {
+    if(e.target === overlay) closeModal();
+  });
+
+  pickBtn.addEventListener('click', () => fileInput.click());
+  swapBtn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if(!file) return;
+    if(currentFileURL) URL.revokeObjectURL(currentFileURL);
+    currentFileURL = URL.createObjectURL(file);
+    pdfFrame.src = currentFileURL;
+    pdfFrame.style.display = 'block';
+    emptyState.style.display = 'none';
+    fileBar.style.display = 'flex';
+    fileName.textContent = file.name;
+    createBtn.disabled = false;
+  });
+
+  createBtn.addEventListener('click', () => {
+    if(createBtn.disabled) return;
+    closeModal();
+    showToast('Order created successfully');
+    resetModal();
+  });
+
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2200);
+  }
+</script>
+
+</body>
+</html>
